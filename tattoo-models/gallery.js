@@ -12,7 +12,6 @@ const guardianLayouts = {
 };
 
 function connectGuardianLayout(gallery) {
-  if (matchMedia("(max-width: 767px)").matches) return;
   const wrapper = gallery.closest(Object.keys(guardianLayouts).map(id => "#" + id).join(","));
   const layout = guardianLayouts[wrapper?.id];
   if (!layout) return;
@@ -22,8 +21,9 @@ function connectGuardianLayout(gallery) {
   // Wix renders the custom element inline on the test and published sites.
   // The empty sizing strip must never cover the original interactive content.
   const styles = document.createElement("style");
-  styles.textContent = `@media (min-width:768px){#${strip.id}{z-index:1} #${layout[1]},#${layout[1]} *{pointer-events:none!important}}`;
+  styles.textContent = `#${layout[1]},#${layout[1]} *{pointer-events:none!important} @media (min-width:768px){#${strip.id}{z-index:1}}`;
   document.head.append(styles);
+  if (matchMedia("(max-width: 767px)").matches) return () => styles.remove();
 
   const measure = () => {
     if (!gallery.isConnected) return;
