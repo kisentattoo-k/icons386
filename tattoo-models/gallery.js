@@ -1,8 +1,8 @@
 const ASSETS = "https://raw.githubusercontent.com/kisentattoo-k/icons386/main/tattoo-models/";
 const sexes = ["male", "female"];
 const copy = {
-  zh: ["紋身模特展示", "男模特", "女模特", "上一張", "下一張", "關閉"],
-  en: ["Tattoo Model Gallery", "Male model", "Female model", "Previous", "Next", "Close"]
+  zh: ["守護神紋身藝術", "男模特", "女模特", "上一張", "下一張", "關閉"],
+  en: ["Guardian Deity Tattoo Art", "Male model", "Female model", "Previous", "Next", "Close"]
 };
 let inventory;
 
@@ -21,20 +21,20 @@ function connectGuardianLayout(gallery) {
   // Wix renders the custom element inline on the test and published sites.
   // The empty sizing strip must never cover the original interactive content.
   const styles = document.createElement("style");
-  styles.textContent = `#${layout[1]},#${layout[1]} *{pointer-events:none!important} @media (min-width:768px){#${strip.id}{z-index:1}}`;
+  // Keep the whole detail layout on the site's black background; some mobile underlays are white.
+  const outer = strip.parentElement?.closest("section");
+  const black = [strip.id, layout[1], outer?.id].filter(Boolean).map(id => `#${id} [data-testid=colorUnderlay]`).join(",");
+  styles.textContent = `#${layout[1]},#${layout[1]} *{pointer-events:none!important} @media (min-width:768px){#${strip.id}{z-index:1}} ${black}{background-color:#000!important}`;
   document.head.append(styles);
-  if (matchMedia("(max-width: 767px)").matches) return () => styles.remove();
 
   const measure = () => {
     if (!gallery.isConnected) return;
-    if (wrapper.closest(".device-mobile-optimized") || matchMedia("(max-width: 767px)").matches) {
-      strip.style.removeProperty("min-height");
-      return;
-    }
+    const mobile = wrapper.closest(".device-mobile-optimized") || matchMedia("(max-width: 767px)").matches;
     const section = strip.getBoundingClientRect();
     const endOfDesign = design.getBoundingClientRect().bottom;
-    const belowSection = navigation.getBoundingClientRect().top - section.bottom;
-    const needed = Math.max(0, Math.ceil(endOfDesign - section.top + 12 - belowSection));
+    // Mobile: the following section is opaque, so the strip itself must contain the whole design block.
+    const belowSection = mobile ? 0 : navigation.getBoundingClientRect().top - section.bottom;
+    const needed = Math.max(0, Math.ceil(endOfDesign - section.top + (mobile ? 24 : 12) - belowSection));
     const value = needed + "px";
     if (strip.style.minHeight !== value) strip.style.setProperty("min-height", value, "important");
   };
@@ -103,6 +103,7 @@ class TattooModelGallery extends HTMLElement {
         .controls{display:flex;justify-content:center;align-items:center;gap:4px}
         button{font:inherit;color:inherit}
         .controls button,dialog button{min-width:44px;min-height:44px;background:#000;border:0;cursor:pointer}
+        .controls .arrow{font-size:22px;line-height:1;min-width:64px;min-height:64px;padding:0 12px;touch-action:manipulation}
         [aria-current=true]{text-decoration:underline}
         .single .controls{display:none}
         dialog{border:0;background:#000;color:white;padding:0;max-width:96vw;max-height:96dvh}
@@ -140,7 +141,12 @@ class TattooModelGallery extends HTMLElement {
     const position = () => Math.round(track.scrollLeft / Math.max(track.clientWidth, 1));
     const go = index => track.scrollTo({ left: Math.max(0, Math.min(index, 1)) * track.clientWidth });
     const dots = [];
-    controls.append(makeButton("‹", labels[3], () => go(position() - 1)));
+    const arrow = (content, label, step) => {
+      const button = makeButton(content, label, () => go(position() + step));
+      button.className = "arrow";
+      return button;
+    };
+    controls.append(arrow("‹", labels[3], -1));
     ready.forEach((image, index) => {
       const slide = makeButton("", image.alt, () => {
         const full = $("dialog img");
@@ -155,7 +161,7 @@ class TattooModelGallery extends HTMLElement {
       dots.push(dot);
       controls.append(dot);
     });
-    controls.append(makeButton("›", labels[4], () => go(position() + 1)));
+    controls.append(arrow("›", labels[4], 1));
     const update = () => dots.forEach((dot, index) => dot.setAttribute("aria-current", index === position()));
     track.addEventListener("scroll", update, { passive: true });
     update();
