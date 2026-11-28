@@ -6,6 +6,50 @@ const copy = {
 };
 let inventory;
 
+const guardianLayouts = {
+  "comp-mwzwcjdo": ["comp-mlej0ott", "comp-mow793zz", "comp-mutm72f5", "comp-moxdftca"],
+  "comp-mwzwtwoh": ["comp-mq4bjmin", "comp-mq4bjmj12", "comp-mw9al4kv", "comp-mq4bjmj42"]
+};
+
+function connectGuardianLayout(gallery) {
+  if (matchMedia("(max-width: 767px)").matches) return;
+  const wrapper = gallery.closest(Object.keys(guardianLayouts).map(id => "#" + id).join(","));
+  const layout = guardianLayouts[wrapper?.id];
+  if (!layout) return;
+  const [strip, spacer, design, navigation] = layout.map(id => document.getElementById(id));
+  if (!strip || !design || !navigation) return;
+
+  // Wix renders the custom element inline on the test and published sites.
+  // The empty sizing strip must never cover the original interactive content.
+  const styles = document.createElement("style");
+  styles.textContent = `@media (min-width:768px){#${strip.id}{z-index:1} #${layout[1]},#${layout[1]} *{pointer-events:none!important}}`;
+  document.head.append(styles);
+
+  const measure = () => {
+    if (!gallery.isConnected) return;
+    if (wrapper.closest(".device-mobile-optimized") || matchMedia("(max-width: 767px)").matches) {
+      strip.style.removeProperty("min-height");
+      return;
+    }
+    const section = strip.getBoundingClientRect();
+    const endOfDesign = design.getBoundingClientRect().bottom;
+    const belowSection = navigation.getBoundingClientRect().top - section.bottom;
+    const needed = Math.max(0, Math.ceil(endOfDesign - section.top + 12 - belowSection));
+    const value = needed + "px";
+    if (strip.style.minHeight !== value) strip.style.setProperty("min-height", value, "important");
+  };
+  const observer = new ResizeObserver(measure);
+  for (const node of [strip, spacer, design, wrapper].filter(Boolean)) observer.observe(node);
+  window.addEventListener("resize", measure);
+  measure();
+  return () => {
+    observer.disconnect();
+    window.removeEventListener("resize", measure);
+    strip.style.removeProperty("min-height");
+    styles.remove();
+  };
+}
+
 class TattooModelGallery extends HTMLElement {
   static observedAttributes = ["code", "lang", "photo-width", "photo-height"];
 
@@ -14,7 +58,11 @@ class TattooModelGallery extends HTMLElement {
     this.attachShadow({ mode: "open" });
   }
 
-  connectedCallback() { this.render(); }
+  connectedCallback() {
+    this.disconnectLayout = connectGuardianLayout(this);
+    this.render();
+  }
+  disconnectedCallback() { this.disconnectLayout?.(); }
   attributeChangedCallback() { if (this.isConnected) this.render(); }
 
   async render() {
